@@ -1,0 +1,871 @@
+<title>SMC TAM Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column of stacked panels, the map as the centerpiece, sizing math above it, tables below. Two-column only where a panel has a sidebar (inputs beside tiles). */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --fg:#14202b; --fg-2:#4d5b69; --fg-3:#7c8894;
+  --line:#dde2e8; --line-2:#c9d0d8; --accent:#17324d; --accent-fg:#ffffff; --wash:#e9eef4;
+  --acct:#2a78d6; --chan:#eb6834; --won:#1baf7a; --acct-soft:#cde2fb; --chan-soft:#fbdccd; --won-soft:#cdeee0;
+  --bay:#dbe7f1; --status-good:#0ca30c;
+  --display:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0f141a; --surface:#171d25; --fg:#eef2f6; --fg-2:#b5bec8; --fg-3:#7f8b97;
+  --line:#2a333d; --line-2:#3a4552; --accent:#8fb6dc; --accent-fg:#0f141a; --wash:#1f2833;
+  --acct:#3987e5; --chan:#d95926; --won:#199e70; --acct-soft:#1c3a5e; --chan-soft:#4a2617; --won-soft:#123e30;
+  --bay:#1a2633; --status-good:#0ca30c; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0f141a; --surface:#171d25; --fg:#eef2f6; --fg-2:#b5bec8; --fg-3:#7f8b97;
+  --line:#2a333d; --line-2:#3a4552; --accent:#8fb6dc; --accent-fg:#0f141a; --wash:#1f2833;
+  --acct:#3987e5; --chan:#d95926; --won:#199e70; --acct-soft:#1c3a5e; --chan-soft:#4a2617; --won-soft:#123e30;
+  --bay:#1a2633; --status-good:#0ca30c; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;margin:0}
+.wrap{max-width:1120px;margin:0 auto;padding-inline:16px;padding-block:20px 56px;display:grid;gap:22px}
+h1,h2,h3{margin:0;font-family:var(--display);text-wrap:balance;line-height:1.2}
+h1{font-size:clamp(26px,3.6vw,36px);font-weight:700;letter-spacing:-.01em}
+h2{font-size:20px;font-weight:600}
+h3{font-size:15px;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--fg-3)}
+.muted{color:var(--fg-2)}
+.small{font-size:13px}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+a{color:var(--accent)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--acct);outline-offset:2px}
+
+/* top bar */
+.top{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px}
+.board{width:22px;height:22px;flex:none;border:1px solid var(--line-2);background-color:var(--surface);
+  background-image:linear-gradient(45deg,var(--accent) 25%,transparent 25%,transparent 75%,var(--accent) 75%),linear-gradient(45deg,var(--accent) 25%,transparent 25%,transparent 75%,var(--accent) 75%);
+  background-size:10px 10px;background-position:0 0,5px 5px}
+.board i{display:none}
+.seg{display:flex;flex-wrap:wrap;gap:4px;padding:4px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.seg button{padding:7px 12px;border-radius:7px;font-size:13.5px;font-weight:500;color:var(--fg-2)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+
+/* generate */
+.gen{display:grid;gap:8px;padding:14px 16px;border:1px dashed var(--line-2);border-radius:12px;background:var(--surface)}
+.gen-fields{display:grid;grid-template-columns:2fr 1fr auto;gap:8px}
+@media (max-width:720px){.gen-fields{grid-template-columns:1fr}}
+.gen input{font:inherit;font-size:14px;padding:9px 11px;border:1px solid var(--line-2);border-radius:8px;background:var(--bg);color:var(--fg);min-width:0}
+.gen button{padding:9px 14px;border-radius:8px;background:var(--accent);color:var(--accent-fg);font-weight:600;font-size:14px;white-space:nowrap}
+.gen button[disabled]{opacity:.6;cursor:wait}
+.gen-note{font-size:12.5px;color:var(--fg-3)}
+.gen-note.err{color:#d03b3b}
+.seg .x{padding:4px 6px;margin-left:-4px;color:var(--fg-3);font-size:12px;border-radius:6px}
+.seg .x:hover{background:var(--wash);color:var(--fg)}
+.seg .tab{display:inline-flex;align-items:center}
+
+/* header */
+.hero{display:grid;gap:10px}
+.hero .lede{max-width:68ch;color:var(--fg-2);font-size:16px}
+.defs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:6px}
+.def{border-top:2px solid var(--line-2);padding-top:8px}
+.def b{display:block;font-size:13px;color:var(--fg-3);font-weight:500;margin-bottom:2px}
+
+/* panels */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:14px;min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+.panel-head p{color:var(--fg-2);max-width:70ch}
+
+/* sizing */
+.sizing{display:grid;grid-template-columns:1fr 280px;gap:18px}
+@media (max-width:760px){.sizing{grid-template-columns:1fr}}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;min-width:0}
+@media (max-width:560px){.tiles{grid-template-columns:1fr}}
+.tile{padding:14px;border:1px solid var(--line);border-radius:10px;display:grid;gap:4px;min-width:0}
+.tile .lab{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.tile .val{font-size:28px;font-weight:600;letter-spacing:-.01em;line-height:1.1}
+.tile .sub{font-size:13px;color:var(--fg-2)}
+.tile .formula{font-family:var(--mono);font-size:11.5px;color:var(--fg-3);margin-top:6px;word-break:break-word}
+.tile.som .val{color:var(--won)}
+.inputs{display:grid;gap:10px;align-content:start;border-left:1px solid var(--line);padding-left:18px}
+@media (max-width:760px){.inputs{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:14px}}
+.field{display:grid;gap:4px}
+.field label{font-size:12.5px;color:var(--fg-2)}
+.field input{font:inherit;font-family:var(--mono);font-size:14px;padding:7px 9px;border:1px solid var(--line-2);border-radius:7px;background:var(--bg);color:var(--fg);width:100%}
+.field .hint{font-size:11.5px;color:var(--fg-3)}
+.funnel{display:grid;gap:6px}
+.bar{height:10px;border-radius:5px;background:var(--wash);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:5px}
+
+/* map */
+.map-tools{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+.layers{display:flex;flex-wrap:wrap;gap:6px}
+.layers button{display:flex;align-items:center;gap:7px;padding:6px 11px;border:1px solid var(--line-2);border-radius:999px;font-size:13px;font-weight:500;color:var(--fg-2)}
+.layers button[aria-pressed="true"]{background:var(--wash);color:var(--fg);border-color:var(--line-2)}
+.layers button[aria-pressed="false"] .sw{opacity:.3}
+.sw{width:11px;height:11px;flex:none;display:inline-block}
+.sw.acct{border-radius:50%;background:var(--acct)}
+.sw.chan{background:var(--chan)}
+.sw.cc{background:var(--chan);transform:rotate(45deg) scale(.85)}
+.sw.won{border-radius:50%;background:var(--won)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--fg-2);margin-left:auto}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.mapbox{position:relative;border:1px solid var(--line);border-radius:10px;background:var(--bg);overflow:hidden}
+.mapbox svg{display:block;width:100%;height:auto;max-width:100%}
+.tip{position:absolute;pointer-events:none;background:var(--surface);color:var(--fg);border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.35;max-width:240px;box-shadow:0 4px 16px rgba(0,0,0,.12);z-index:2}
+.tip b{display:block;font-size:13px}
+.tip .k{color:var(--fg-3)}
+.city{font-family:var(--mono);font-size:11px;fill:var(--fg-3);letter-spacing:.06em;text-transform:uppercase}
+.acct-dot{fill:var(--acct);fill-opacity:.28;stroke:var(--acct);stroke-width:1.5;cursor:pointer;transition:fill-opacity .15s}
+.acct-dot:hover{fill-opacity:.55}
+.acct-dot.t1{fill-opacity:.42}
+.acct-dot.t3{fill-opacity:.16;stroke-dasharray:3 2}
+.acct-dot.active{stroke:var(--won);stroke-width:2.5;fill:var(--won);fill-opacity:.35}
+.acct-dot.won{stroke:var(--won);stroke-width:2.5;fill:var(--won);fill-opacity:.6}
+.acct-dot.warm{stroke:var(--won);stroke-width:2;stroke-dasharray:4 2}
+.lib{fill:var(--chan);stroke:var(--surface);stroke-width:1.5;cursor:pointer}
+.lib.won{fill:var(--won)}
+.cc{fill:var(--chan);fill-opacity:.7;stroke:var(--surface);stroke-width:1.5;cursor:pointer}
+.cc.won{fill:var(--won);fill-opacity:1}
+.ring{fill:none;stroke:var(--won);stroke-width:2}
+.home{fill:var(--won);stroke:var(--surface);stroke-width:2}
+.map-empty{padding:40px 18px;text-align:center;display:grid;gap:8px;justify-items:center;color:var(--fg-2)}
+.map-empty code{font-family:var(--mono);font-size:12.5px;background:var(--wash);padding:2px 6px;border-radius:5px}
+.map-note{font-size:12.5px;color:var(--fg-3)}
+
+/* tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:640px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11.5px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);font-weight:500;background:var(--bg);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:500;border:1px solid var(--line-2);white-space:nowrap}
+.pill.t1{background:var(--acct-soft);border-color:transparent}
+.pill.t2{background:var(--wash)}
+.pill.t3{color:var(--fg-2)}
+.pill.st{cursor:pointer}
+.pill.st.untouched{color:var(--fg-2)}
+.pill.st.warm{border-color:var(--won);color:var(--fg)}
+.pill.st.active{background:var(--won-soft);border-color:transparent}
+.pill.st.won{background:var(--won);color:#fff;border-color:transparent}
+.pill.chan{background:var(--chan-soft);border-color:transparent}
+.filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.filters button{padding:5px 10px;border:1px solid var(--line-2);border-radius:999px;font-size:12.5px;color:var(--fg-2)}
+.filters button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.approx{color:var(--fg-3)}
+
+/* results */
+.results{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.res{border:1px solid var(--line);border-left:3px solid var(--won);border-radius:10px;padding:12px 14px;display:grid;gap:4px}
+.res .v{font-size:22px;font-weight:600;line-height:1.1}
+.res .k{font-size:13px;color:var(--fg-2)}
+.res .how{font-size:12.5px;color:var(--fg-3)}
+
+/* next moves */
+.moves{display:grid;gap:8px}
+.move{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;align-items:start}
+.move .n{font-family:var(--mono);font-size:13px;color:var(--fg-3);padding-top:2px}
+.move b{font-weight:600}
+.move .why{font-size:13px;color:var(--fg-2)}
+.move .via{font-size:12.5px;margin-top:3px}
+.move .via span{color:var(--chan);font-weight:500}
+
+/* template */
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.step{border-top:2px solid var(--accent);padding-top:10px;display:grid;gap:4px}
+.step .n{font-family:var(--mono);font-size:12px;color:var(--fg-3)}
+.step p{font-size:13.5px;color:var(--fg-2)}
+.cfg{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.cfg .c{background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:6px;min-width:0}
+.cfg .c b{font-size:12px;font-family:var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);font-weight:500}
+.cfg .c ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--fg-2)}
+.cfg .c li{margin:2px 0}
+.cfg .c .val{font-size:14px}
+.sources{font-size:12.5px;color:var(--fg-3)}
+.sources ul{margin:4px 0 0;padding-left:18px}
+.sources li{margin:2px 0}
+.copybtn{padding:5px 10px;border:1px solid var(--line-2);border-radius:7px;font-size:12.5px;color:var(--fg-2)}
+.copybtn:hover{background:var(--wash)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="board" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div><div class="eyebrow">Total addressable market · accounts, channels, results</div><h1 id="pageTitle">SMC TAM Map</h1></div>
+    </div>
+    <div class="seg" id="nicheSeg" role="group" aria-label="Niche"></div>
+  </div>
+
+  <form class="gen" id="genForm" autocomplete="off">
+    <div class="gen-fields">
+      <input id="genNiche" type="text" placeholder="Map a new niche, e.g. campground reservation software" maxlength="200" required>
+      <input id="genGeo" type="text" placeholder="Geography (optional), e.g. Oregon" maxlength="120">
+      <button type="submit" id="genBtn">Generate with Claude</button>
+    </div>
+    <p class="gen-note" id="genNote">Claude pulls the buyer, a first-pass account list with sizes and coordinates, the channels that reach them, and a tier rule. The map renders from that config the same way it renders SMC.</p>
+  </form>
+
+  <section class="hero">
+    <p class="lede" id="lede"></p>
+    <div class="defs" id="defs"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Market sizing</h2><p>Every figure below is computed from the inputs on the right. Change an input and the tiles, the funnel, and the tier rule on the map update together.</p></div>
+    <div class="sizing">
+      <div style="display:grid;gap:12px;min-width:0">
+        <div class="tiles" id="tiles"></div>
+        <div class="funnel" id="funnel"></div>
+      </div>
+      <div class="inputs" id="inputs"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>The map</h2><p id="mapLede"></p></div>
+    <div class="map-tools">
+      <div class="layers" id="layers">
+        <button type="button" data-layer="accounts" aria-pressed="true"><span class="sw acct"></span>Accounts</button>
+        <button type="button" data-layer="channels" aria-pressed="true"><span class="sw chan"></span>Channels</button>
+        <button type="button" data-layer="results" aria-pressed="true"><span class="sw won"></span>Results</button>
+      </div>
+      <div class="legend" id="legend">
+        <span><span class="sw acct"></span>District, sized by enrollment</span>
+        <span><span class="sw chan"></span>Library branch</span>
+        <span><span class="sw cc"></span>Community center</span>
+        <span><span class="sw won"></span>Won / active</span>
+      </div>
+    </div>
+    <div class="mapbox" id="mapbox"></div>
+    <p class="map-note" id="mapNote"></p>
+  </section>
+
+  <section class="panel" id="resultsPanel">
+    <div class="panel-head"><h2>Results overlay</h2><p id="resultsLede"></p></div>
+    <div class="results" id="results"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Where to go next</h2><p>Warm accounts first, since they are closest to closing, then the largest untouched accounts by tier. Each is paired with its nearest partner venue and the play that fits its stage. The same rule that produced the existing wins, applied to the rest of the map.</p></div>
+    <div class="moves" id="moves"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Accounts</h2><p>Click a status to change it. Statuses you set are kept in this browser so the map stays current as outreach moves.</p></div>
+    <div class="filters" id="tierFilters"><span class="muted">Show:</span></div>
+    <div class="tablewrap"><table id="acctTable"></table></div>
+    <p class="small approx" id="acctNote"></p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Channels</h2><p>The places that reach the buyer before any ad does. Partner venues carry a status too.</p></div>
+    <div class="tablewrap"><table id="chanTable"></table></div>
+    <p class="small approx" id="chanNote"></p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Rerun it for any niche</h2><p>SMC is the worked example. The map is a config, not a one-off: swap the four blocks below and the sizing, tiering, and next-move logic run unchanged.</p></div>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><h3>Define the buyer</h3><p>One sentence. Who signs, who uses it, what they pay per year.</p></div>
+      <div class="step"><span class="n">2</span><h3>Pull the account list</h3><p>A public directory with a size column and a location. Enrollment, sites, members, beds.</p></div>
+      <div class="step"><span class="n">3</span><h3>Pull the channel list</h3><p>The venues and associations the buyer already trusts. Libraries, leagues, tourism boards.</p></div>
+      <div class="step"><span class="n">4</span><h3>Overlay results, apply the rule</h3><p>Mark what's won. The tier rule ranks everything else by size and distance from the wins.</p></div>
+    </div>
+    <div class="panel-head" style="margin-top:6px"><h3 id="cfgTitle"></h3><button type="button" class="copybtn" id="copyCfg">Copy config as JSON</button></div>
+    <div class="cfg" id="cfg"></div>
+    <div class="sources" id="sources"></div>
+  </section>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ---------- data ---------- */
+const NICHES = {
+  smc: {
+    key:'smc', label:'SMC Solutions', title:'SMC TAM Map',
+    lede:'SMC Solutions sells chess education to families in Santa Clara County: $20 a month, all-access, 300 students, grown almost entirely by referral. This map plots the districts those families come from, the public venues that reach them, and where SMC has already won.',
+    buyer:'Parents of K–8 students; the student is the user, the parent pays.',
+    unit:'One enrolled student',
+    price:240, priceLabel:'Revenue per student per year ($20 × 12)',
+    geo:'Santa Clara County, anchored on Cupertino',
+    home:{name:'Cupertino Library (SMC home base; first of 11 venues won)',lat:37.3186,lng:-122.0318},
+    tamPop:227187, tamPopLabel:'County K–12 enrollment, 2025–26',
+    share:5, shareLabel:'Share of K–8 students who would enroll in a paid chess program (%)', shareHint:'Assumption. Use your own conversion data as it comes in.',
+    t1km:8, t2km:16,
+    sizeLabel:'Enrollment',
+    mapLede:'Blue circles are school districts, sized by enrollment and tiered by drive distance from the home base. Orange marks are library branches and community centers. Green is where SMC has already won: the West Valley cluster of libraries and the districts around them.',
+    mapNote:'Positions are schematic (district office or branch location). Enrollment is 2024–25 or 2025–26 from Ed-Data / CDE; values marked ~ are rounded.',
+    resultsLede:'What SMC has already produced, so the untouched areas on the map read against a track record rather than a plan.',
+    results:[
+      {v:'300',k:'students enrolled',how:'$20/month all-access, online and in person. Grown by word of mouth with no paid marketing at the start.'},
+      {v:'75%',k:'of growth from referral',how:'Lead-source analysis showed referral outpaced every other channel, which is why the plan leans on events and partners instead of ads.'},
+      {v:'11 venues',k:'won across the West Valley',how:'Cupertino, Saratoga, Sunnyvale, Campbell, Los Altos, Santa Clara, Mountain View, Los Gatos, West Valley and Calabazas libraries plus Quinlan Community Center. Entry needs a library card, so the library gets new cardholders and SMC gets local families as first touch.'},
+      {v:'8 districts',k:'won or active, 10 more warm',how:'Students enrolled from every K–8 district inside the Tier 1 band. Tournaments held at public libraries because that is where the audience already is; free for members, non-members need a free library card.'},
+      {v:'$500K',k:'pipeline from a 200-account named list',how:'Named-account outreach to schools and programs, tracked first touch to enrollment in HubSpot.'},
+      {v:'−25%',k:'cost per click on a $40K budget',how:'Geo-targeted paid social around partner venues, measured against enrollment rate rather than clicks.'}
+    ],
+    accounts:[
+      {id:'pausd',name:'Palo Alto Unified',cities:'Palo Alto',size:10500,approx:true,grades:'K–12',lat:37.44,lng:-122.14},
+      {id:'lasd',name:'Los Altos SD',cities:'Los Altos, Mountain View',size:3900,approx:true,grades:'K–8',lat:37.385,lng:-122.11},
+      {id:'mvw',name:'Mountain View Whisman',cities:'Mountain View',size:4700,approx:true,grades:'K–8',lat:37.39,lng:-122.08},
+      {id:'mvla',name:'Mountain View–Los Altos UHSD',cities:'Mountain View, Los Altos',size:4500,approx:true,grades:'9–12',lat:37.40,lng:-122.10},
+      {id:'sunny',name:'Sunnyvale SD',cities:'Sunnyvale',size:5465,grades:'K–8',lat:37.37,lng:-122.03},
+      {id:'cusd',name:'Cupertino Union',cities:'Cupertino, Sunnyvale, W. San José',size:13533,grades:'K–8',lat:37.318,lng:-122.041},
+      {id:'fuhsd',name:'Fremont Union HSD',cities:'Cupertino, Sunnyvale',size:9289,grades:'9–12',lat:37.34,lng:-122.02},
+      {id:'scusd',name:'Santa Clara Unified',cities:'Santa Clara, Sunnyvale',size:14448,grades:'K–12',lat:37.36,lng:-121.96},
+      {id:'saru',name:'Saratoga Union',cities:'Saratoga',size:1800,approx:true,grades:'K–8',lat:37.26,lng:-122.02},
+      {id:'lgu',name:'Los Gatos Union',cities:'Los Gatos',size:2700,approx:true,grades:'K–8',lat:37.23,lng:-121.97},
+      {id:'lgs',name:'Los Gatos–Saratoga UHSD',cities:'Los Gatos, Saratoga',size:3000,approx:true,grades:'9–12',lat:37.245,lng:-121.99},
+      {id:'cu',name:'Campbell Union',cities:'Campbell, San José',size:6800,approx:true,grades:'K–8',lat:37.29,lng:-121.95},
+      {id:'cuhsd',name:'Campbell Union HSD',cities:'Campbell, W. San José',size:8639,grades:'9–12',lat:37.28,lng:-121.93},
+      {id:'more',name:'Moreland SD',cities:'W. San José',size:4000,approx:true,grades:'K–8',lat:37.30,lng:-121.98},
+      {id:'camb',name:'Cambrian SD',cities:'San José, Los Gatos',size:2919,grades:'K–8',lat:37.26,lng:-121.93},
+      {id:'union',name:'Union SD',cities:'San José',size:5000,approx:true,grades:'K–8',lat:37.24,lng:-121.90},
+      {id:'sjusd',name:'San José Unified',cities:'San José',size:24311,grades:'K–12',lat:37.32,lng:-121.89},
+      {id:'oak',name:'Oak Grove SD',cities:'S. San José',size:8000,approx:true,grades:'K–8',lat:37.25,lng:-121.83},
+      {id:'fmsd',name:'Franklin-McKinley',cities:'San José',size:8807,grades:'K–8',lat:37.30,lng:-121.84},
+      {id:'ar',name:'Alum Rock Union',cities:'E. San José',size:8000,approx:true,grades:'K–8',lat:37.36,lng:-121.83},
+      {id:'ever',name:'Evergreen SD',cities:'E. San José',size:11528,grades:'K–8',lat:37.30,lng:-121.78},
+      {id:'berry',name:'Berryessa Union',cities:'N. San José',size:6000,approx:true,grades:'K–8',lat:37.39,lng:-121.86},
+      {id:'esuhsd',name:'East Side Union HSD',cities:'E. San José',size:21000,approx:true,grades:'9–12',lat:37.34,lng:-121.82},
+      {id:'milp',name:'Milpitas Unified',cities:'Milpitas',size:10000,approx:true,grades:'K–12',lat:37.43,lng:-121.90},
+      {id:'mh',name:'Morgan Hill Unified',cities:'Morgan Hill',size:8000,approx:true,grades:'K–12',lat:37.13,lng:-121.65},
+      {id:'gil',name:'Gilroy Unified',cities:'Gilroy',size:10500,approx:true,grades:'K–12',lat:37.00,lng:-121.57}
+    ],
+    defaultStatus:{cusd:'won',fuhsd:'active',sunny:'active',saru:'active',scusd:'active',more:'active',cu:'active',lasd:'active',
+      pausd:'warm',mvw:'warm',mvla:'warm',lgu:'warm',lgs:'warm',cuhsd:'warm',camb:'warm',union:'warm',sjusd:'warm',milp:'warm'},
+    defaultChanStatus:{'l-cup':'won','l-sar':'won','l-sun':'won','l-camp':'won','l-la':'won','l-scc':'won','l-mv':'won','s-wv':'won','s-cal':'won','l-lg':'won','c-quin':'won'},
+    channels:[
+      // Santa Clara County Library District
+      {id:'l-cup',name:'Cupertino Library',sys:'SCCLD',type:'library',city:'Cupertino',lat:37.3186,lng:-122.0318,status:'won'},
+      {id:'l-camp',name:'Campbell Library',sys:'SCCLD',type:'library',city:'Campbell',lat:37.287,lng:-121.945},
+      {id:'l-la',name:'Los Altos Library',sys:'SCCLD',type:'library',city:'Los Altos',lat:37.377,lng:-122.113},
+      {id:'l-wood',name:'Woodland Branch',sys:'SCCLD',type:'library',city:'Los Altos',lat:37.395,lng:-122.10},
+      {id:'l-milp',name:'Milpitas Library',sys:'SCCLD',type:'library',city:'Milpitas',lat:37.428,lng:-121.906},
+      {id:'l-mh',name:'Morgan Hill Library',sys:'SCCLD',type:'library',city:'Morgan Hill',lat:37.13,lng:-121.655},
+      {id:'l-sar',name:'Saratoga Library',sys:'SCCLD',type:'library',city:'Saratoga',lat:37.265,lng:-122.01},
+      {id:'l-gil',name:'Gilroy Library',sys:'SCCLD',type:'library',city:'Gilroy',lat:37.006,lng:-121.57},
+      // city systems
+      {id:'l-sun',name:'Sunnyvale Public Library',sys:'City of Sunnyvale',type:'library',city:'Sunnyvale',lat:37.372,lng:-122.037},
+      {id:'l-scc',name:'Central Park Library',sys:'Santa Clara City',type:'library',city:'Santa Clara',lat:37.353,lng:-121.965},
+      {id:'l-scn',name:'Northside Branch',sys:'Santa Clara City',type:'library',city:'Santa Clara',lat:37.395,lng:-121.95},
+      {id:'l-scm',name:'Mission Branch',sys:'Santa Clara City',type:'library',city:'Santa Clara',lat:37.35,lng:-121.94},
+      {id:'l-mv',name:'Mountain View Public Library',sys:'City of Mountain View',type:'library',city:'Mountain View',lat:37.393,lng:-122.08},
+      {id:'l-pam',name:'Mitchell Park Library',sys:'Palo Alto City',type:'library',city:'Palo Alto',lat:37.42,lng:-122.11},
+      {id:'l-par',name:'Rinconada Library',sys:'Palo Alto City',type:'library',city:'Palo Alto',lat:37.44,lng:-122.14},
+      {id:'l-pad',name:'Downtown Library',sys:'Palo Alto City',type:'library',city:'Palo Alto',lat:37.446,lng:-122.16},
+      {id:'l-pac',name:'College Terrace Library',sys:'Palo Alto City',type:'library',city:'Palo Alto',lat:37.42,lng:-122.15},
+      {id:'l-pach',name:"Children's Library",sys:'Palo Alto City',type:'library',city:'Palo Alto',lat:37.442,lng:-122.135},
+      {id:'l-lg',name:'Los Gatos Library',sys:'Town of Los Gatos',type:'library',city:'Los Gatos',lat:37.22,lng:-121.98},
+      // San José Public Library
+      {id:'s-king',name:'Dr. Martin Luther King Jr. Library',sys:'SJPL',type:'library',city:'San José',lat:37.335,lng:-121.885},
+      {id:'s-alm',name:'Almaden Branch',sys:'SJPL',type:'library',city:'San José',lat:37.22,lng:-121.88},
+      {id:'s-alv',name:'Alviso Branch',sys:'SJPL',type:'library',city:'San José',lat:37.425,lng:-121.975},
+      {id:'s-bas',name:'Bascom Branch',sys:'SJPL',type:'library',city:'San José',lat:37.30,lng:-121.93},
+      {id:'s-ber',name:'Berryessa Branch',sys:'SJPL',type:'library',city:'San José',lat:37.395,lng:-121.86},
+      {id:'s-bib',name:'Biblioteca Latinoamericana',sys:'SJPL',type:'library',city:'San José',lat:37.32,lng:-121.88},
+      {id:'s-cal',name:'Calabazas Branch',sys:'SJPL',type:'library',city:'San José',lat:37.31,lng:-121.995},
+      {id:'s-cam',name:'Cambrian Branch',sys:'SJPL',type:'library',city:'San José',lat:37.26,lng:-121.92},
+      {id:'s-cruz',name:'Dr. Roberto Cruz – Alum Rock',sys:'SJPL',type:'library',city:'San José',lat:37.355,lng:-121.84},
+      {id:'s-esj',name:'East San José Carnegie',sys:'SJPL',type:'library',city:'San José',lat:37.345,lng:-121.85},
+      {id:'s-eden',name:'Edenvale Branch',sys:'SJPL',type:'library',city:'San José',lat:37.245,lng:-121.80},
+      {id:'s-edp',name:'Educational Park Branch',sys:'SJPL',type:'library',city:'San José',lat:37.36,lng:-121.82},
+      {id:'s-ever',name:'Evergreen Branch',sys:'SJPL',type:'library',city:'San José',lat:37.30,lng:-121.77},
+      {id:'s-hill',name:'Hillview Branch',sys:'SJPL',type:'library',city:'San José',lat:37.33,lng:-121.82},
+      {id:'s-joy',name:'Joyce Ellington Branch',sys:'SJPL',type:'library',city:'San José',lat:37.325,lng:-121.90},
+      {id:'s-mtp',name:'Mt. Pleasant Branch',sys:'SJPL',type:'library',city:'San José',lat:37.32,lng:-121.78},
+      {id:'s-pearl',name:'Pearl Avenue Branch',sys:'SJPL',type:'library',city:'San José',lat:37.265,lng:-121.86},
+      {id:'s-rose',name:'Rose Garden Branch',sys:'SJPL',type:'library',city:'San José',lat:37.33,lng:-121.92},
+      {id:'s-st',name:'Santa Teresa Branch',sys:'SJPL',type:'library',city:'San José',lat:37.24,lng:-121.79},
+      {id:'s-sev',name:'Seven Trees Branch',sys:'SJPL',type:'library',city:'San José',lat:37.29,lng:-121.84},
+      {id:'s-tul',name:'Tully Community Branch',sys:'SJPL',type:'library',city:'San José',lat:37.32,lng:-121.84},
+      {id:'s-vs',name:'Village Square Branch',sys:'SJPL',type:'library',city:'San José',lat:37.28,lng:-121.82},
+      {id:'s-vin',name:'Vineland Branch',sys:'SJPL',type:'library',city:'San José',lat:37.235,lng:-121.87},
+      {id:'s-wg',name:'Willow Glen Branch',sys:'SJPL',type:'library',city:'San José',lat:37.30,lng:-121.895},
+      {id:'s-wv',name:'West Valley Branch',sys:'SJPL',type:'library',city:'San José',lat:37.31,lng:-121.97},
+      // community centers
+      {id:'c-quin',name:'Quinlan Community Center',sys:'City of Cupertino',type:'community center',city:'Cupertino',lat:37.322,lng:-122.032},
+      {id:'c-sun',name:'Sunnyvale Community Center',sys:'City of Sunnyvale',type:'community center',city:'Sunnyvale',lat:37.36,lng:-122.02},
+      {id:'c-scc',name:'Central Park Rec Center',sys:'City of Santa Clara',type:'community center',city:'Santa Clara',lat:37.354,lng:-121.962},
+      {id:'c-mv',name:'Mountain View Community Center',sys:'City of Mountain View',type:'community center',city:'Mountain View',lat:37.39,lng:-122.09},
+      {id:'c-camp',name:'Campbell Community Center',sys:'City of Campbell',type:'community center',city:'Campbell',lat:37.285,lng:-121.952},
+      {id:'c-sar',name:'Joan Pisani Community Center',sys:'City of Saratoga',type:'community center',city:'Saratoga',lat:37.27,lng:-122.02},
+      {id:'c-la',name:'Hillview Community Center',sys:'City of Los Altos',type:'community center',city:'Los Altos',lat:37.38,lng:-122.11},
+      {id:'c-pa',name:'Mitchell Park Community Center',sys:'City of Palo Alto',type:'community center',city:'Palo Alto',lat:37.421,lng:-122.108}
+    ],
+    otherChannels:[
+      {name:'School PTAs',count:'~400',note:'One per public school in the county. The parent-to-parent channel behind the 75% referral number.'},
+      {name:'San José PRNS sites',count:'200+',note:'Parks, Recreation & Neighborhood Services runs 200+ locations; add centers as you activate them.'},
+      {name:'Private & independent schools',count:'—',note:'Harker, Challenger, Stratford, BASIS and similar. Pull from the CDE private school directory.'}
+    ],
+    acctNote:'Enrollment sources: Ed-Data and CDE district profiles (2024–25 / 2025–26). ~ marks a rounded figure. Tier is computed from the drive-band inputs above and the district grade span; K–8 and unified districts can be Tier 1, high-school-only districts start at Tier 2.',
+    chanNote:'44 public library branches across seven systems: Santa Clara County Library District (8), San José Public Library (25), and the Sunnyvale, Santa Clara, Mountain View, Palo Alto and Los Gatos city libraries. Community centers listed are the closest to the home base; the county has far more.',
+    sources:[
+      ['Santa Clara County enrollment 227,187 (2025–26)','https://www.ed-data.org/county/Santa%20Clara/'],
+      ['Cupertino Union 13,533 (2024–25)','https://www.ed-data.org/district/Santa-Clara/Cupertino-Union'],
+      ['Fremont Union HSD 9,289 (2025–26)','https://www.cde.ca.gov/sdprofile/details.aspx?cds=43694680000000'],
+      ['San José Unified 24,311 (2025–26)','https://www.cde.ca.gov/sdprofile/details.aspx?cds=43696660000000'],
+      ['Santa Clara Unified 14,448 (2024–25)','https://en.wikipedia.org/wiki/Santa_Clara_Unified_School_District'],
+      ['Santa Clara County Library District branches','https://en.wikipedia.org/wiki/Santa_Clara_County_Library_District'],
+      ['San José Public Library branches','https://en.wikipedia.org/wiki/San_Jose_Public_Library'],
+      ['San José PRNS, 200+ locations','https://www.sanjoseca.gov/your-government/departments-offices/parks-recreation-neighborhood-services/general-information']
+    ]
+  },
+
+  camp: {
+    key:'camp', label:'Campgrounds', title:'Campground TAM Map',
+    lede:"Template run for a campground reservation product (the Let's Camp shape in Beacon's portfolio). Same four blocks as SMC: a buyer, an account list with a size column, the channels that reach it, and a results layer to fill as wins land.",
+    buyer:'Owner or GM of an independent campground or RV park; front-desk staff are the users.',
+    unit:'One campground on subscription',
+    price:2400, priceLabel:'Subscription revenue per campground per year',
+    geo:'Start with one state, then rerun per state',
+    home:null,
+    tamPop:15000, tamPopLabel:'Campgrounds in the account list (example input, replace with the directory count)',
+    share:20, shareLabel:'Share of listed campgrounds that are independently owned and take online bookings (%)', shareHint:'Assumption until the directory is filtered.',
+    t1km:40, t2km:120,
+    sizeLabel:'Sites',
+    mapLede:'No accounts loaded yet. Paste a list with a size column (campsites) and coordinates and the map plots them exactly as it plots districts.',
+    mapNote:'',
+    resultsLede:'',
+    results:[],
+    accounts:[], channels:[],
+    otherChannels:[
+      {name:'State campground & RV park associations',count:'~40',note:'ARVC state affiliates. The trade show and newsletter channel.'},
+      {name:'State tourism boards',count:'50',note:'Co-listing and seasonal campaign partners.'},
+      {name:'Outdoor retailers & RV dealers',count:'—',note:'Where new RV owners are; a card-at-checkout partnership mirrors the library-card rule.'}
+    ],
+    acctNote:'Account source: state park reservation directories, KOA and Good Sam directories, Campendium. Size column: number of sites.',
+    chanNote:'Channel source: ARVC member list, state tourism board partner pages, RV dealer directories.',
+    sources:[]
+  },
+
+  sports: {
+    key:'sports', label:'Youth sports', title:'Youth Sports TAM Map',
+    lede:'Template run for a league and club management product (the PowerUp Sports / E2E Soccer shape). The buyer is a volunteer administrator, so the channels that reach them matter more than the account list itself.',
+    buyer:'League or club administrator (usually a volunteer board); coaches and parents are the users.',
+    unit:'One league or club on subscription',
+    price:1800, priceLabel:'Subscription revenue per club per year',
+    geo:'One state association at a time',
+    home:null,
+    tamPop:3000, tamPopLabel:'Clubs in the state association list (example input, replace)',
+    share:35, shareLabel:'Share of clubs large enough to pay for software (100+ players) (%)', shareHint:'Assumption until the roster sizes are pulled.',
+    t1km:30, t2km:80,
+    sizeLabel:'Players',
+    mapLede:'No accounts loaded yet. Club lists from a state association carry city and roster size; that is enough to plot and tier them.',
+    mapNote:'', resultsLede:'', results:[], accounts:[], channels:[],
+    otherChannels:[
+      {name:'City parks & recreation departments',count:'—',note:'They allocate fields and run the rec leagues that feed clubs. The equivalent of the library.'},
+      {name:'State associations & tournament organizers',count:'~55',note:'US Youth Soccer state associations, Little League districts, AAU districts.'},
+      {name:'School athletic directors',count:'—',note:'Middle and high school ADs know every club in their area.'}
+    ],
+    acctNote:'Account source: state association club directories, Little League district lists, AAU club search. Size column: registered players.',
+    chanNote:'Channel source: city parks & rec facility lists, tournament calendars, state association event pages.',
+    sources:[]
+  },
+
+  college: {
+    key:'college', label:'College counseling', title:'College Counseling TAM Map',
+    lede:'Template run for a college-planning product (the College Kickstart shape). Two account types share one map: high school counseling offices and independent educational consultants.',
+    buyer:'Head of counseling at a high school, or an independent educational consultant; families are the end users.',
+    unit:'One school or consultant on subscription',
+    price:3000, priceLabel:'Subscription revenue per account per year',
+    geo:'One metro at a time',
+    home:null,
+    tamPop:24000, tamPopLabel:'Public and private high schools in the account list (example input, replace with NCES count)',
+    share:25, shareLabel:'Share of schools with a dedicated college counselor (%)', shareHint:'Assumption; filter on counselor-to-student ratio.',
+    t1km:25, t2km:60,
+    sizeLabel:'Students',
+    mapLede:'No accounts loaded yet. NCES high school data carries enrollment and coordinates; IECA member listings carry city.',
+    mapNote:'', resultsLede:'', results:[], accounts:[], channels:[],
+    otherChannels:[
+      {name:'PTAs and parent booster groups',count:'—',note:'Same parent-to-parent channel as SMC, one per school.'},
+      {name:'College fairs (NACAC, regional)',count:'~100/yr',note:'Where counselors and families are in the same room.'},
+      {name:'Public libraries',count:'—',note:'Libraries run college-prep nights. The SMC library-card rule transfers directly.'}
+    ],
+    acctNote:'Account source: NCES Common Core of Data (public), CDE private school directory, IECA member directory. Size column: enrollment.',
+    chanNote:'Channel source: NACAC fair calendar, state PTA directories, library event calendars.',
+    sources:[]
+  }
+};
+
+/* ---------- state ---------- */
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem('tam:'+k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
+  set(k,v){ try{ localStorage.setItem('tam:'+k, JSON.stringify(v)); }catch(e){} }
+};
+// Generated niches (from /api/generate) are kept in this browser.
+function normalizeGenerated(cfg, key){
+  const slug = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,40);
+  const n = { ...cfg, key, results:[], defaultStatus:{}, defaultChanStatus:{}, mapNote: cfg.mapNote || 'Positions and sizes are Claude\'s first pass from public data; values marked ~ are estimates. Verify before you rely on a row.', resultsLede:'' };
+  n.accounts = (cfg.accounts||[]).map((a,i)=>({ id:'a-'+i+'-'+slug(a.name), grades:a.grades||'', ...a }));
+  n.channels = (cfg.channels||[]).map((c,i)=>({ id:'c-'+i+'-'+slug(c.name), ...c }));
+  n.otherChannels = cfg.otherChannels||[];
+  n.sources = (cfg.sources||[]).filter(s=>Array.isArray(s)&&s.length===2);
+  return n;
+}
+(store.get('generated',[])||[]).forEach(g=>{ if(g&&g.key) NICHES[g.key]=normalizeGenerated(g,g.key); });
+let niche = NICHES[store.get('niche','smc')] || NICHES.smc;
+let layers = {accounts:true, channels:true, results:true};
+let tierFilter = 'all';
+let inputs = {};
+let statuses = {};
+let chanStatuses = {};
+
+function loadNicheState(){
+  const saved = store.get('inputs:'+niche.key, {});
+  inputs = { price:niche.price, tamPop:niche.tamPop, share:niche.share, t1km:niche.t1km, t2km:niche.t2km, ...saved };
+  statuses = { ...(niche.defaultStatus||{}), ...store.get('status:'+niche.key, {}) };
+  chanStatuses = { ...(niche.defaultChanStatus||{}), ...store.get('chanstatus:'+niche.key, {}) };
+}
+const chanSt = c => chanStatuses[c.id] || 'untouched';
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const fmt = n => Math.round(n).toLocaleString('en-US');
+const money = n => n>=1e6 ? '$'+(n/1e6).toFixed(1)+'M' : n>=1e4 ? '$'+Math.round(n/1e3)+'K' : '$'+fmt(n);
+const pct = n => (n*100).toFixed(1)+'%';
+function km(a,b){ const R=6371,dLat=(b.lat-a.lat)*Math.PI/180,dLng=(b.lng-a.lng)*Math.PI/180;
+  const s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s)); }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+const STATUS_ORDER=['untouched','warm','active','won'];
+const STATUS_LABEL={untouched:'Untouched',warm:'Warm',active:'Active',won:'Won'};
+
+function enriched(){
+  return niche.accounts.map(a=>{
+    const d = niche.home ? km(niche.home,a) : null;
+    const k8 = a.grades!=='9–12';
+    let tier = 3;
+    if(d!=null){ if(d<=inputs.t1km && k8) tier=1; else if(d<=inputs.t2km) tier=2; }
+    const st = statuses[a.id]||'untouched';
+    const k8size = a.grades==='K–12' ? Math.round(a.size*9/13) : k8 ? a.size : 0;
+    let nearest=null;
+    niche.channels.filter(c=>niche.key!=='smc'||c.type==='library').forEach(c=>{ const dd=km(a,c); if(!nearest||dd<nearest.d) nearest={c,d:dd}; });
+    return {...a, d, tier, st, k8size, nearest};
+  });
+}
+
+/* ---------- render: niche switcher & header ---------- */
+function renderSeg(){
+  const seg=$('#nicheSeg'); seg.innerHTML='';
+  Object.values(NICHES).forEach(n=>{
+    const wrap=document.createElement('span'); wrap.className='tab';
+    const b=document.createElement('button'); b.type='button'; b.textContent=n.label;
+    b.setAttribute('aria-pressed', n.key===niche.key ? 'true':'false');
+    b.addEventListener('click',()=>{ niche=n; store.set('niche',n.key); loadNicheState(); renderAll(); });
+    wrap.appendChild(b);
+    if(n.generated){
+      const x=document.createElement('button'); x.type='button'; x.className='x'; x.textContent='×'; x.title='Remove this generated niche'; x.setAttribute('aria-label','Remove '+n.label);
+      x.addEventListener('click',()=>{ delete NICHES[n.key]; store.set('generated',(store.get('generated',[])||[]).filter(g=>g.key!==n.key)); if(niche.key===n.key){ niche=NICHES.smc; store.set('niche','smc'); loadNicheState(); } renderAll(); });
+      wrap.appendChild(x);
+    }
+    seg.appendChild(wrap);
+  });
+}
+function renderHeader(){
+  $('#pageTitle').textContent = niche.title;
+  document.title = niche.title;
+  $('#lede').textContent = niche.lede;
+  $('#defs').innerHTML = [
+    ['Buyer', niche.buyer],
+    ['Unit of value', niche.unit],
+    ['Geography', niche.geo],
+    ['Home base', niche.home ? niche.home.name : 'Set when the first win lands']
+  ].map(([k,v])=>`<div class="def"><b>${k}</b>${esc(v)}</div>`).join('');
+}
+
+/* ---------- render: sizing ---------- */
+function renderInputs(){
+  const defs=[
+    ['tamPop', niche.tamPopLabel, '', 1],
+    ['price', niche.priceLabel, '', 1],
+    ['share', niche.shareLabel, niche.shareHint, 0.5],
+    ['t1km', 'Tier 1 drive band (km from home base)', niche.key==='smc' ? 'Tier 1 also requires the K–8 grade span.' : (niche.home ? '' : 'Applies once a home base is set.'), 1],
+    ['t2km', 'Tier 2 drive band (km)', '', 1]
+  ];
+  $('#inputs').innerHTML = `<div class="eyebrow">Inputs</div>` + defs.map(([k,l,h,step])=>`
+    <div class="field"><label for="in-${niche.key}-${k}">${esc(l)}</label>
+    <input id="in-${niche.key}-${k}" type="number" inputmode="decimal" step="${step}" min="0" value="${inputs[k]}" data-k="${k}">
+    ${h?`<span class="hint">${esc(h)}</span>`:''}</div>`).join('') +
+    `<button type="button" class="copybtn" id="resetInputs">Reset to defaults</button>`;
+  $('#inputs').querySelectorAll('input').forEach(i=>i.addEventListener('input',e=>{
+    const v=parseFloat(e.target.value); if(isNaN(v)) return;
+    inputs[e.target.dataset.k]=v; store.set('inputs:'+niche.key, inputs); renderSizing(); renderMap(); renderMoves(); renderAccounts();
+  }));
+  $('#resetInputs').addEventListener('click',()=>{ store.set('inputs:'+niche.key,{}); loadNicheState(); renderInputs(); renderSizing(); renderMap(); renderMoves(); renderAccounts(); });
+}
+function sizing(){
+  const rows=enriched();
+  const tam = inputs.tamPop*inputs.price;
+  let samUnits, samLabel, samFormula;
+  if(niche.key==='smc'){
+    const k8 = rows.filter(r=>r.tier<=2).reduce((s,r)=>s+r.k8size,0);
+    samUnits = k8*inputs.share/100;
+    samLabel = `${fmt(k8)} K–8 students in Tier 1–2 districts × ${inputs.share}%`;
+    samFormula = `Σ K–8 enrollment (tier ≤ 2) × share`;
+  } else {
+    samUnits = inputs.tamPop*inputs.share/100;
+    samLabel = `${fmt(inputs.tamPop)} accounts × ${inputs.share}%`;
+    samFormula = `accounts × qualifying share`;
+  }
+  const sam = samUnits*inputs.price;
+  const somUnits = niche.key==='smc' ? 300 : 0;
+  const som = somUnits*inputs.price;
+  return {tam,sam,som,samUnits,somUnits,samLabel,samFormula};
+}
+function renderSizing(){
+  const s=sizing();
+  const somSub = niche.key==='smc' ? `300 students today · ${pct(s.som/s.sam)} of SAM` : 'Fill in as accounts close';
+  $('#tiles').innerHTML = `
+    <div class="tile"><div class="lab"><span class="eyebrow">TAM</span></div><div class="val num">${money(s.tam)}</div>
+      <div class="sub">${esc(fmt(inputs.tamPop))} × ${money(inputs.price)}/yr</div><div class="formula">${esc(niche.tamPopLabel)} × price</div></div>
+    <div class="tile"><div class="lab"><span class="eyebrow">SAM</span></div><div class="val num">${money(s.sam)}</div>
+      <div class="sub">${esc(s.samLabel)} = ${fmt(s.samUnits)} units</div><div class="formula">${esc(s.samFormula)} × price</div></div>
+    <div class="tile som"><div class="lab"><span class="eyebrow">SOM (today)</span></div><div class="val num">${money(s.som)}</div>
+      <div class="sub">${esc(somSub)}</div><div class="formula">units won × price</div></div>`;
+  const w = v => Math.max(0.6, 100*v/s.tam);
+  $('#funnel').innerHTML = `
+    <div class="small muted">Funnel, to scale against TAM</div>
+    <div class="bar"><i style="width:100%;background:var(--acct-soft)"></i></div>
+    <div class="bar"><i style="width:${w(s.sam)}%;background:var(--acct)"></i></div>
+    <div class="bar"><i style="width:${w(s.som)}%;background:var(--won)"></i></div>
+    <div class="small muted num">TAM 100% · SAM ${pct(s.sam/s.tam)} · SOM ${pct(s.som/s.tam)}</div>`;
+}
+
+/* ---------- render: map ---------- */
+const SMC_BOUNDS={lngMin:-122.22,lngMax:-121.50,latMin:36.95,latMax:37.49}, W=900, H=600;
+let BOUNDS=SMC_BOUNDS;
+function fitBounds(){
+  if(niche.key==='smc'){ BOUNDS=SMC_BOUNDS; return; }
+  const pts=[...niche.accounts,...niche.channels]; if(niche.home) pts.push(niche.home);
+  if(!pts.length){ BOUNDS=SMC_BOUNDS; return; }
+  let lngMin=Math.min(...pts.map(p=>p.lng)), lngMax=Math.max(...pts.map(p=>p.lng)), latMin=Math.min(...pts.map(p=>p.lat)), latMax=Math.max(...pts.map(p=>p.lat));
+  // pad, then match the viewBox aspect so distances read the same in both axes
+  const padLng=(lngMax-lngMin||1)*0.12, padLat=(latMax-latMin||1)*0.12;
+  lngMin-=padLng; lngMax+=padLng; latMin-=padLat; latMax+=padLat;
+  const cosLat=Math.cos((latMin+latMax)/2*Math.PI/180);
+  const wDeg=(lngMax-lngMin)*cosLat, hDeg=latMax-latMin, target=W/H;
+  if(wDeg/hDeg>target){ const need=wDeg/target, extra=(need-hDeg)/2; latMin-=extra; latMax+=extra; }
+  else { const need=hDeg*target/cosLat, extra=(need-(lngMax-lngMin))/2; lngMin-=extra; lngMax+=extra; }
+  BOUNDS={lngMin,lngMax,latMin,latMax};
+}
+const px = p => ({x:(p.lng-BOUNDS.lngMin)/(BOUNDS.lngMax-BOUNDS.lngMin)*W, y:(BOUNDS.latMax-p.lat)/(BOUNDS.latMax-BOUNDS.latMin)*H});
+const CITIES=[['Palo Alto',37.455,-122.15],['Mountain View',37.405,-122.07],['Sunnyvale',37.395,-122.045],['Cupertino',37.298,-122.09],['Santa Clara',37.375,-121.96],['Saratoga',37.25,-122.04],['Los Gatos',37.215,-121.99],['Campbell',37.283,-121.965],['San José',37.335,-121.905],['Milpitas',37.445,-121.905],['Morgan Hill',37.145,-121.67],['Gilroy',37.015,-121.59]];
+
+function renderMap(){
+  $('#mapLede').textContent = niche.mapLede;
+  $('#mapNote').textContent = niche.mapNote;
+  const box=$('#mapbox');
+  if(!niche.accounts.length){
+    box.innerHTML = `<div class="map-empty"><b>No accounts plotted for this niche yet</b>
+      <p>Add rows to <code>accounts</code> with <code>name · size · lat · lng</code> and to <code>channels</code> with <code>name · type · lat · lng</code>. Set <code>home</code> to the first win. Everything else on this page recomputes.</p>
+      <p class="small">Sizing above already runs from the inputs, so the TAM and SAM tiles work before a single account is plotted.</p></div>`;
+    return;
+  }
+  fitBounds();
+  const rows=enriched();
+  const maxSize=Math.max(...rows.map(r=>r.size));
+  const rad = s => 6 + 22*Math.sqrt(s/maxSize);
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Schematic map of accounts, partner venues and wins">`;
+  if(niche.key==='smc'){
+    const bay = [[-122.22,37.49],[-122.05,37.49],[-121.93,37.47],[-121.95,37.44],[-122.03,37.43],[-122.12,37.45],[-122.22,37.42]].map(([lng,lat])=>{const p=px({lng,lat});return p.x+','+p.y;}).join(' ');
+    svg += `<polygon points="${bay}" fill="var(--bay)"/>`;
+    svg += `<text class="city" x="${px({lng:-122.19,lat:37.475}).x}" y="${px({lng:-122.19,lat:37.475}).y}">S.F. Bay</text>`;
+    CITIES.forEach(([n,lat,lng])=>{const p=px({lat,lng}); svg+=`<text class="city" x="${p.x}" y="${p.y}" text-anchor="middle">${esc(n)}</text>`;});
+  } else {
+    // label each distinct city once, at the first account that names it
+    const seen=new Set();
+    rows.forEach(r=>{ const c=(r.cities||'').split(',')[0].trim(); if(!c||seen.has(c)) return; seen.add(c); const p=px(r); svg+=`<text class="city" x="${p.x.toFixed(1)}" y="${(p.y-rad(r.size)-4).toFixed(1)}" text-anchor="middle">${esc(c)}</text>`; });
+  }
+  // drive bands
+  if(niche.home && layers.accounts){
+    const h=px(niche.home);
+    const a={lat:niche.home.lat,lng:niche.home.lng}, b={lat:niche.home.lat,lng:niche.home.lng+0.1};
+    const kmToPx = k => k/km(a,b)*(px(b).x-px(a).x);
+    svg += `<circle cx="${h.x}" cy="${h.y}" r="${kmToPx(inputs.t2km)}" fill="none" stroke="var(--line-2)" stroke-dasharray="4 4"/>`;
+    svg += `<circle cx="${h.x}" cy="${h.y}" r="${kmToPx(inputs.t1km)}" fill="none" stroke="var(--line-2)" stroke-dasharray="4 4"/>`;
+  }
+  if(layers.accounts){
+    rows.slice().sort((a,b)=>b.size-a.size).forEach(r=>{
+      const p=px(r); const cls = ['acct-dot','t'+r.tier, layers.results && r.st!=='untouched' ? r.st : ''].join(' ');
+      svg += `<circle class="${cls}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${rad(r.size).toFixed(1)}" data-tip="acct" data-id="${r.id}" tabindex="0"/>`;
+    });
+  }
+  if(layers.channels){
+    niche.channels.forEach(c=>{
+      const p=px(c); const won = layers.results && (chanSt(c)==='won'||chanSt(c)==='active');
+      if(c.type==='library') svg += `<rect class="lib${won?' won':''}" x="${(p.x-4.5).toFixed(1)}" y="${(p.y-4.5).toFixed(1)}" width="9" height="9" data-tip="chan" data-id="${c.id}" tabindex="0"/>`;
+      else svg += `<rect class="cc${won?' won':''}" x="${(p.x-4).toFixed(1)}" y="${(p.y-4).toFixed(1)}" width="8" height="8" transform="rotate(45 ${p.x.toFixed(1)} ${p.y.toFixed(1)})" data-tip="chan" data-id="${c.id}" tabindex="0"/>`;
+    });
+  }
+  if(layers.results && niche.home){
+    const h=px(niche.home);
+    svg += `<circle class="ring" cx="${h.x}" cy="${h.y}" r="13"/><circle class="home" cx="${h.x}" cy="${h.y}" r="5"><title>${esc(niche.home.name)}</title></circle>`;
+  }
+  svg += `</svg><div class="tip" id="tip" hidden></div>`;
+  box.innerHTML = svg;
+  const tip=$('#tip');
+  const show=(el,ev)=>{
+    const kind=el.dataset.tip, id=el.dataset.id;
+    let html='';
+    if(kind==='acct'){ const r=rows.find(x=>x.id===id);
+      html=`<b>${esc(r.name)}</b><span class="k">${esc(r.cities)} · ${r.grades}</span><br>${niche.sizeLabel}: <span class="num">${r.approx?'~':''}${fmt(r.size)}</span><br>Tier ${r.tier}${r.d!=null?` · ${r.d.toFixed(0)} km from home base`:''}<br>Status: ${STATUS_LABEL[r.st]}${r.nearest?`<br><span class="k">Nearest venue:</span> ${esc(r.nearest.c.name)} (${r.nearest.d.toFixed(1)} km)`:''}`;
+    } else { const c=niche.channels.find(x=>x.id===id);
+      html=`<b>${esc(c.name)}</b><span class="k">${esc(c.sys)} · ${esc(c.city)}</span><br>${c.type==='library'?'Library branch':'Community center'}${chanSt(c)!=='untouched'?` · <b style="display:inline;color:var(--won)">${STATUS_LABEL[chanSt(c)]}</b>`:''}`;
+    }
+    tip.innerHTML=html; tip.hidden=false;
+    const bb=box.getBoundingClientRect(); const eb=el.getBoundingClientRect();
+    let x=eb.left-bb.left+eb.width/2+10, y=eb.top-bb.top-10;
+    if(x+250>bb.width) x=eb.left-bb.left-250; if(x<0) x=8;
+    tip.style.left=x+'px'; tip.style.top=Math.max(4,y)+'px';
+  };
+  box.querySelectorAll('[data-tip]').forEach(el=>{
+    el.addEventListener('mouseenter',e=>show(el,e)); el.addEventListener('focus',e=>show(el,e));
+    el.addEventListener('mouseleave',()=>tip.hidden=true); el.addEventListener('blur',()=>tip.hidden=true);
+    el.addEventListener('click',()=>{ if(el.dataset.tip==='acct'){ const row=document.getElementById('row-'+el.dataset.id); if(row){ row.scrollIntoView({behavior:'smooth',block:'center'}); } } });
+  });
+}
+$('#layers').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  layers[b.dataset.layer]=!layers[b.dataset.layer]; b.setAttribute('aria-pressed',String(layers[b.dataset.layer])); renderMap();
+});
+
+/* ---------- render: results ---------- */
+function renderResults(){
+  const p=$('#resultsPanel');
+  if(!niche.results.length){
+    $('#resultsLede').textContent='Nothing won yet for this niche. As accounts and venues close, mark them Won in the tables and add the numbers here; the map and the next-move list pick them up.';
+    $('#results').innerHTML=`<div class="res" style="border-left-color:var(--line-2)"><div class="v muted">—</div><div class="k">First win</div><div class="how">Set the home base to it. Tiering runs from there.</div></div>`;
+    return;
+  }
+  $('#resultsLede').textContent=niche.resultsLede;
+  $('#results').innerHTML = niche.results.map(r=>`<div class="res"><div class="v num">${esc(r.v)}</div><div class="k">${esc(r.k)}</div><div class="how">${esc(r.how)}</div></div>`).join('');
+}
+
+/* ---------- render: next moves ---------- */
+function renderMoves(){
+  const el=$('#moves');
+  if(!niche.accounts.length){ el.innerHTML=`<div class="move"><span class="n">—</span><div><b>Load accounts to rank them</b><div class="why">The rule: untouched, inside the Tier 1–2 band, sorted by size, paired with the nearest venue.</div></div></div>`; return; }
+  const rank = r => (r.st==='warm'?0:1)*10 + r.tier;
+  const rows=enriched().filter(r=>r.st==='warm'||r.st==='untouched').sort((a,b)=>rank(a)-rank(b)||b.k8size-a.k8size).slice(0,8);
+  if(!rows.length){ el.innerHTML=`<div class="move"><span class="n">✓</span><div><b>Every account is active or won</b><div class="why">Add accounts beyond the county or widen the account list.</div></div></div>`; return; }
+  el.innerHTML = rows.map((r,i)=>{
+    const venue = r.nearest ? `<span>${esc(r.nearest.c.name)}</span> (${r.nearest.d.toFixed(1)} km)` : 'the nearest venue';
+    const play = niche.key==='smc'
+      ? (r.st==='warm'
+        ? `Close with ${venue}: members-only tournament as the conversion event, referral tier for families already enrolled.`
+        : `Open with ${venue}: open chess day, library-card entry, QR sign-up tagged to this venue.`)
+      : (r.st==='warm'
+        ? `Close through ${venue}: a member-only event or offer the partner co-hosts, tracked to the account.`
+        : `Open through ${venue}: a free event or listing the partner hosts, with sign-up tagged to this venue.`);
+    const sizeTxt = niche.key==='smc' ? `${fmt(r.k8size)} K–8 students` : `${fmt(r.size)} ${esc(niche.sizeLabel.toLowerCase())}`;
+    return `<div class="move"><span class="n">${i+1}</span><div>
+    <b>${esc(r.name)}</b> <span class="pill t${r.tier}">Tier ${r.tier}</span> <span class="pill st ${r.st}">${STATUS_LABEL[r.st]}</span>
+    <div class="why">${r.approx?'~':''}${sizeTxt} · ${r.d!=null?r.d.toFixed(0)+' km from home base · ':''}${esc(r.cities)}</div>
+    <div class="via">${play}</div>
+  </div></div>`;}).join('');
+}
+
+/* ---------- render: tables ---------- */
+function renderTierFilters(){
+  const f=$('#tierFilters'); f.querySelectorAll('button').forEach(b=>b.remove());
+  [['all','All'],['1','Tier 1'],['2','Tier 2'],['3','Tier 3'],['touched','Touched']].forEach(([k,l])=>{
+    const b=document.createElement('button'); b.type='button'; b.textContent=l; b.setAttribute('aria-pressed',String(tierFilter===k));
+    b.addEventListener('click',()=>{tierFilter=k; renderTierFilters(); renderAccounts();}); f.appendChild(b);
+  });
+}
+function renderAccounts(){
+  const t=$('#acctTable');
+  $('#acctNote').textContent=niche.acctNote;
+  if(!niche.accounts.length){ t.innerHTML=`<thead><tr><th>Account</th><th>Location</th><th class="num">${esc(niche.sizeLabel)}</th><th>Tier</th><th>Status</th></tr></thead><tbody><tr><td colspan="5" class="muted">No rows yet. Columns are fixed so a pulled list drops straight in.</td></tr></tbody>`; return; }
+  let rows=enriched().sort((a,b)=>a.tier-b.tier||b.size-a.size);
+  if(tierFilter==='touched') rows=rows.filter(r=>r.st!=='untouched'); else if(tierFilter!=='all') rows=rows.filter(r=>String(r.tier)===tierFilter);
+  const smc = niche.key==='smc';
+  t.innerHTML = `<thead><tr><th>${smc?'District':'Account'}</th><th>${smc?'Cities':'Location'}</th>${smc?'<th>Grades</th>':''}<th class="num">${esc(niche.sizeLabel)}</th><th class="num">Km</th><th>Tier</th><th>Status</th><th>Nearest venue</th></tr></thead><tbody>` +
+    rows.map(r=>`<tr id="row-${r.id}"><td><b>${esc(r.name)}</b></td><td class="muted">${esc(r.cities)}</td>${smc?`<td class="muted">${r.grades}</td>`:''}
+      <td class="num">${r.approx?'<span class="approx">~</span>':''}${fmt(r.size)}</td><td class="num muted">${r.d!=null?r.d.toFixed(0):'—'}</td>
+      <td><span class="pill t${r.tier}">Tier ${r.tier}</span></td>
+      <td><button type="button" class="pill st ${r.st}" data-id="${r.id}" title="Click to change">${STATUS_LABEL[r.st]}</button></td>
+      <td class="muted">${r.nearest?`${esc(r.nearest.c.name)} <span class="num">(${r.nearest.d.toFixed(1)} km)</span>`:'—'}</td></tr>`).join('') + `</tbody>`;
+  t.querySelectorAll('.pill.st').forEach(b=>b.addEventListener('click',()=>{
+    const cur=statuses[b.dataset.id]||'untouched'; const nx=STATUS_ORDER[(STATUS_ORDER.indexOf(cur)+1)%STATUS_ORDER.length];
+    statuses[b.dataset.id]=nx; const saved=store.get('status:'+niche.key,{}); saved[b.dataset.id]=nx; store.set('status:'+niche.key,saved);
+    renderAccounts(); renderMap(); renderMoves();
+  }));
+}
+function renderChannels(){
+  const t=$('#chanTable'); $('#chanNote').textContent=niche.chanNote;
+  const rows=niche.channels.slice().sort((a,b)=>(a.type>b.type?1:a.type<b.type?-1:0)||a.sys.localeCompare(b.sys)||a.name.localeCompare(b.name));
+  let html=`<thead><tr><th>Venue</th><th>Type</th><th>System</th><th>City</th><th>Status</th></tr></thead><tbody>`;
+  html += rows.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td><span class="pill chan">${c.type}</span></td><td class="muted">${esc(c.sys)}</td><td class="muted">${esc(c.city)}</td>
+    <td><button type="button" class="pill st ${chanSt(c)}" data-cid="${c.id}" title="Click to change">${STATUS_LABEL[chanSt(c)]}</button></td></tr>`).join('');
+  html += niche.otherChannels.map(o=>`<tr><td><b>${esc(o.name)}</b> <span class="muted num">${esc(o.count)}</span></td><td><span class="pill chan">channel type</span></td><td class="muted" colspan="3">${esc(o.note)}</td></tr>`).join('');
+  t.innerHTML = html+`</tbody>`;
+  t.querySelectorAll('.pill.st').forEach(b=>b.addEventListener('click',()=>{
+    const cur=chanStatuses[b.dataset.cid]||'untouched'; const nx=STATUS_ORDER[(STATUS_ORDER.indexOf(cur)+1)%STATUS_ORDER.length];
+    chanStatuses[b.dataset.cid]=nx; const saved=store.get('chanstatus:'+niche.key,{}); saved[b.dataset.cid]=nx; store.set('chanstatus:'+niche.key,saved);
+    renderChannels(); renderMap();
+  }));
+}
+
+/* ---------- render: template ---------- */
+function config(){
+  return {
+    niche:niche.label, buyer:niche.buyer, unit_of_value:niche.unit, price_per_year:inputs.price, geography:niche.geo,
+    home_base:niche.home, tier_rule:{tier1_km:inputs.t1km, tier1_requires:niche.key==='smc'?'K–8 grade span':'primary account type', tier2_km:inputs.t2km},
+    sizing:{tam_units:inputs.tamPop, qualifying_share_pct:inputs.share, som_units:niche.key==='smc'?300:0},
+    accounts:{source:niche.acctNote, size_column:niche.sizeLabel, rows:niche.accounts.length},
+    channels:{source:niche.chanNote, venue_types:[...new Set(niche.channels.map(c=>c.type))].concat(niche.otherChannels.map(o=>o.name)), rows:niche.channels.length},
+    results:niche.results.map(r=>r.v+' '+r.k)
+  };
+}
+function renderTemplate(){
+  $('#cfgTitle').textContent = `Config: ${niche.label}`;
+  const c=config();
+  $('#cfg').innerHTML = `
+    <div class="c"><b>Buyer</b><div class="val">${esc(c.buyer)}</div><ul><li>Unit: ${esc(c.unit_of_value)}</li><li>Price: ${money(c.price_per_year)}/yr</li><li>Geography: ${esc(c.geography)}</li></ul></div>
+    <div class="c"><b>Accounts</b><div class="val">${c.accounts.rows} rows · size = ${esc(c.accounts.size_column)}</div><ul><li>${esc(niche.acctNote.split('.')[0])}.</li></ul></div>
+    <div class="c"><b>Channels</b><div class="val">${c.channels.rows} venues plotted</div><ul>${c.channels.venue_types.map(v=>`<li>${esc(v)}</li>`).join('')}</ul></div>
+    <div class="c"><b>Tier rule</b><div class="val">≤ ${c.tier_rule.tier1_km} km + ${esc(c.tier_rule.tier1_requires)} → Tier 1</div><ul><li>≤ ${c.tier_rule.tier2_km} km → Tier 2</li><li>Else Tier 3</li><li>Next move = largest untouched Tier 1–2, nearest venue</li></ul></div>`;
+  const src=$('#sources');
+  src.innerHTML = niche.sources.length ? `Sources<ul>${niche.sources.map(([t,u])=>`<li><a href="${u}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join('')}</ul>` : `Sources to pull: ${esc(niche.acctNote)} ${esc(niche.chanNote)}`;
+}
+$('#copyCfg').addEventListener('click',()=>{
+  const txt=JSON.stringify(config(),null,2); const b=$('#copyCfg');
+  const done=()=>{ b.textContent='Copied'; setTimeout(()=>b.textContent='Copy config as JSON',1500); };
+  if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(txt).then(done).catch(()=>fallback()); } else fallback();
+  function fallback(){ const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); try{document.execCommand('copy');done();}catch(e){} document.body.removeChild(ta); }
+});
+
+/* ---------- generate a niche with Claude ---------- */
+$('#genForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const nicheTxt=$('#genNiche').value.trim(), geo=$('#genGeo').value.trim();
+  const btn=$('#genBtn'), note=$('#genNote');
+  if(nicheTxt.length<3) return;
+  btn.disabled=true; btn.textContent='Generating… (20–40 s)'; note.className='gen-note'; note.textContent='Claude is pulling the buyer, accounts, channels and tier rule for this niche.';
+  try{
+    const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({niche:nicheTxt,geography:geo})});
+    let data=null; try{ data=await r.json(); }catch(_){}
+    if(!r.ok||!data||data.error) throw new Error((data&&data.error)||(r.status===404?'The generator runs on the deployed site (it needs the /api/generate function).':'Generation failed ('+r.status+').'));
+    const key='gen-'+Date.now().toString(36);
+    data.key=key;
+    const saved=(store.get('generated',[])||[]); saved.push(data); store.set('generated',saved);
+    NICHES[key]=normalizeGenerated(data,key);
+    niche=NICHES[key]; store.set('niche',key); loadNicheState(); renderAll();
+    note.textContent=`Added “${data.label}”. Positions and counts are a first pass; click any status to mark what you know.`;
+    $('#genNiche').value=''; $('#genGeo').value='';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(err){ note.className='gen-note err'; note.textContent = (err instanceof TypeError) ? 'Could not reach the generator. It runs on the deployed site, where /api/generate is live.' : err.message; }
+  finally{ btn.disabled=false; btn.textContent='Generate with Claude'; }
+});
+
+/* ---------- boot ---------- */
+function renderAll(){ renderSeg(); renderHeader(); renderInputs(); renderSizing(); renderMap(); renderResults(); renderMoves(); renderTierFilters(); renderAccounts(); renderChannels(); renderTemplate(); }
+loadNicheState(); renderAll();
+})();
+</script>

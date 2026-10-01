@@ -1,0 +1,17 @@
+{
+  "name": "tam-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TAM map for vertical market software: accounts, channels, results, and a Claude-generated config for any niche.",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.130.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
