@@ -123,12 +123,18 @@ export default async function handler(req, res) {
       max_tokens: 8000,
       system: SYSTEM,
       tools: [CONFIG_TOOL],
-      tool_choice: { type: "tool", name: "tam_config" },
-      messages: [{ role: "user", content: `Niche: ${niche}\nGeography: ${geography || "pick the most sensible single state or metro to start with, and say which"}` }]
+      messages: [{ role: "user", content: `Niche: ${niche}\nGeography: ${geography || "pick the most sensible single state or metro to start with, and say which"}\n\nRespond by calling the tam_config tool exactly once. Do not reply in prose.` }]
     });
+    let cfg = null;
     const block = msg.content.find(b => b.type === "tool_use" && b.name === "tam_config");
-    if (!block) return res.status(502).json({ error: "The model did not return a config. Try rephrasing the niche." });
-    const cfg = block.input;
+    if (block) cfg = block.input;
+    else {
+      // Fallback: the model answered in text; pull the first JSON object out of it.
+      const text = msg.content.filter(b => b.type === "text").map(b => b.text).join("\n");
+      const m = text.match(/\{[\s\S]*\}/);
+      if (m) { try { cfg = JSON.parse(m[0]); } catch { cfg = null; } }
+    }
+    if (!cfg || !Array.isArray(cfg.accounts)) return res.status(502).json({ error: "The model did not return a config. Try rephrasing the niche." });
     cfg.generated = true;
     cfg.generatedAt = new Date().toISOString();
     cfg.model = MODEL;
